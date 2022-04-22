@@ -2,7 +2,6 @@
 # Author: Na'zeer Greene
 # CS360 Database Management
 
-from ast import Break
 from datetime import datetime as dt
 from Grocery_Store_Manager import Inventory, Cart
 
@@ -99,11 +98,11 @@ def receipt(list_of_items):
     total_str = str(total)
 
     out += '\n'
-    out += f'Subtotal {subtotal_str : >20}'
+    out += f'Subtotal {subtotal : >20.2f}'
     out += '\n'
-    out += f'Tax {tax_str : >25}'
+    out += f'Tax {tax : >25.2f}'
     out += '\n'
-    out += f'Total {total_str : >23}'
+    out += f'Total {total : >23.2f}'
     out += '\n'
 
     with open('Receipt.txt', 'w') as receipt:
@@ -111,13 +110,6 @@ def receipt(list_of_items):
     
     print(out)
 
-
-def checkout(cart, inventory):
-    pass
-
-
-def add_item_to_cart(item, inventory):
-    pass
 
 # ------------- HELPER FUNCTIONS -------------
 def get_int(prompt, min, max):
@@ -198,11 +190,15 @@ def main():
             print()
             print_inventory(aisles_inventory_cache.get(in_aisle), product_enumeration_offset)
 
-            user_choice = input('Choose a number to add item to cart or enter "back" >> ')
+            user_choice = input('Enter a number, "aisles/back", or "checkout/buy" >> ')
             user_choice = user_choice.lower()
 
-            if 'back' == user_choice:
+            if user_choice in ['aisles', 'back']:
                 STATE = state.AISLES
+                continue
+
+            if user_choice in ['checkout', 'buy']:
+                STATE = state.CHECKOUT
                 continue
             
             # there's no point in continuing
@@ -210,34 +206,58 @@ def main():
                 continue
 
             if DEBUG: print('[DEBUG] options: ', aisles_inventory_cache.get(in_aisle))
-            user_int = int(user_choice)
-            item_min = product_enumeration_offset
-            item_max = item_min + len(aisles_inventory_cache.get(in_aisle)) - 1
 
-            if  user_int < item_min or item_max < user_int:
-                print(f'>>\tChoose an integer between {item_min} and {item_max} inclusive.')
+            # we have to check for valid input!
+            user_int = int(user_choice)
+            index_min = product_enumeration_offset
+            index_max = index_min + len(aisles_inventory_cache.get(in_aisle)) - 1
+
+            if  user_int < index_min or index_max < user_int:
+                print(f'>>\tChoose an integer between {index_min} and {index_max} inclusive.')
                 continue
 
+            # now we can assume the input is valid
             item_index = user_int - product_enumeration_offset
             item = aisles_inventory_cache.get(in_aisle)[item_index]
 
             # we have to check if the product is available in inventory
             print()
             if item.get_count() < inventory.product_quantity_for(item.get_ID()):
-                print(f'\tAdding {item} to cart!')
+                print(f'>>\tAdding {item} to cart!')
                 cart.add_item(item)
             else:
                 print(f">>\tYou've already reached the max amount of {item.get_name()} in your cart.")
             print()
 
-            #print(f'aisles dict: {aisles_inventory_cache.keys()}')
+            if DEBUG: print(f'aisles dict: {aisles_inventory_cache.keys()}')
 
-            #print(f'user_choice : {user_choice}')
-            #print(f'inventory: {aisles_inventory_cache.get(user_choice)}')
-            #print_inventory(aisles_inventory_cache.get(user_choice), product_enumeration_offset)
+            if DEBUG: print(f'user_choice : {user_choice}')
+            if DEBUG: print(f'inventory: {aisles_inventory_cache.get(user_choice)}')
+            if DEBUG: print_inventory(aisles_inventory_cache.get(user_choice), product_enumeration_offset)
 
         if state.CHECKOUT == STATE: #-----------------------------------------------------------
-            pass
+            print()
+            print("We see that you're ready to check out! Let's get started.")
+            print()
+
+            Items_list = cart.items()
+            if DEBUG: print(Items_list)
+
+            if [] == Items_list:
+                print("You haven't bought anything, what a shame... see you next time!")
+                print()
+                STATE = state.LEAVE
+                continue
+
+            for item in Items_list:
+                # update inventory with the new quantities
+                inventory.decrement_product_quantity_for(item.get_ID(), item.get_count())
+            
+            receipt(Items_list)
+
+            cart.empty_cart()
+
+            STATE = state.LEAVE
 
         if state.LEAVE == STATE: #--------------------------------------------------------------
             print('Goodbye!')
@@ -245,31 +265,9 @@ def main():
         
         
 
-    '''
-    shelf = inventory.get_aisle_inventory(1)
-
-    print_inventory(shelf)
-
-    for _ in range(3):
-        cart.add_item(shelf[0])
-        inventory.decrement_product_count_for(shelf[0].get_ID(), 1)
-    
-    cart.add_item(shelf[1])
-    inventory.decrement_product_count_for(shelf[1].get_ID(), 1)
-
-
-    print('In cart...')
-    for item in cart.items():
-        print(item.get_count(), '/', inventory.product_count_for(item.get_ID()) ,' ', item.get_name())
-    
-    #receipt(cart.items())
-
-    print()
-    print()
-    '''
-
-    
-
 
 if __name__ == "__main__":
     main()
+
+    with open('Receipt.txt', 'r') as receipt:
+        receipt.read()

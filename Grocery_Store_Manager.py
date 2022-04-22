@@ -34,7 +34,7 @@ class Item:
         return False
     
     def __str__(self):
-        return '($' + str(self.__price) + ') ' + self.__name
+        return '($' + f'{self.__price: .2f}' + ') ' + self.__name
 
     def __repr__(self):
         return 'Item( ' + ', '.join([str(self.__ID), str(self.__name), str(self.__price)]) + ', ' + str(self.__count) + ' )'
@@ -187,8 +187,25 @@ class Inventory:
         Raises ConnectionError on failure to connect."""
 
         try:
-            product_list = self.__cur.execute('SELECT product, productCount FROM AisleProductPlacement;').fetchall()
+            product_list = self.__cur.execute('SELECT product, quantity FROM AisleProductPlacement;').fetchall()
             return { int(i[0]) : int(i[1]) for i in product_list }
+
+        except sql.Error as err:
+            raise ConnectionError(f'Could not fetch aisle layout from database: {self.__db_file}')
+
+    def __save_to_database(self):
+        """Commit inventory from memory to database.
+        Raises error on connection or commitment failure.
+        
+        There should be changes after a call to decrement_product_quantity_for()."""
+
+        try:
+            for product, quantity in self.__products_quantity.items():
+
+                self.__cur.execute('''
+                    UPDATE AisleProductPlacement
+                    SET quantity = ?
+                    WHERE product = ?;''', (quantity, product))
 
         except sql.Error as err:
             raise ConnectionError(f'Could not fetch aisle layout from database: {self.__db_file}')
@@ -197,5 +214,6 @@ class Inventory:
     def __del__(self):
         print('Deleting inventory and closing resources.')
         # release resources
+        self.__save_to_database()
         self.__conn.commit()
         self.__conn.close()
